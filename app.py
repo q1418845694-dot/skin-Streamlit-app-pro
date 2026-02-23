@@ -22,8 +22,8 @@ st.title("🩺 皮肤病智能识别系统 (Swin Transformer)")
 st.markdown("上传皮肤镜图像，模型将预测其所属的病变类别。")
 
 # -------------------- 模型下载配置 --------------------
-MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/best_model.pth"
-MODEL_PATH = "best_model.pth"
+MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/best_model(1).pth"
+MODEL_PATH = "best_model(1).pth"
 CSV_PATH   = "Train_Ready.csv"
 
 def download_file(url, local_filename):
