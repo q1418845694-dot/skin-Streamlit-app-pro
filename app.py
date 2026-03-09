@@ -25,8 +25,8 @@ st.markdown("上传皮肤镜图像并填写症状描述，模型将融合两者�
 
 # -------------------- 模型下载配置 --------------------
 # 多模态模型文件（请替换为你的实际链接）
-MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/blob/main/best_multimodal_model-2de90228a316.pth"
-MODEL_PATH = "best_multimodal_model-2de90228a316.pth"
+MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/blob/main/best_multimodal_model.pth"
+MODEL_PATH = "best_multimodal_model.pth"
 CSV_PATH   = "Train_Ready.csv"
 
 def download_file(url, local_filename, expected_size_mb=100):
