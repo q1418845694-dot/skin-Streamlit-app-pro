@@ -29,16 +29,25 @@ MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/
 MODEL_PATH = "best_multimodal_model.pth"
 CSV_PATH   = "Train_Ready.csv"
 
-def download_file(url, local_filename, expected_size_mb=100):
-    """从URL下载文件，若本地文件太小则重新下载"""
+def download_file(url, local_filename, expected_size_mb=300):
+    """从URL下载文件，若本地文件不存在、过小或损坏则重新下载"""
+    # 如果本地存在，先检查大小和有效性
     if os.path.exists(local_filename):
         file_size = os.path.getsize(local_filename) / (1024 * 1024)
         if file_size > expected_size_mb:
-            st.info(f"✅ 模型文件已存在：{local_filename} ({file_size:.1f} MB)")
-            return True
+            # 快速验证：尝试加载第一个张量（不保留）
+            try:
+                torch.load(local_filename, map_location='cpu', weights_only=False)
+                st.info(f"✅ 模型文件已存在且有效：{local_filename} ({file_size:.1f} MB)")
+                return True
+            except Exception as e:
+                st.warning(f"⚠️ 本地模型文件损坏 ({file_size:.1f} MB)，将重新下载... 错误：{e}")
+                os.remove(local_filename)
         else:
-            st.warning(f"⚠️ 本地模型文件过小 ({file_size:.1f} MB)，可能已损坏，将重新下载...")
+            st.warning(f"⚠️ 本地模型文件过小 ({file_size:.1f} MB)，将重新下载...")
             os.remove(local_filename)
+
+    # 下载新文件
     try:
         st.info("⏳ 正在下载多模态模型文件（约数百MB），请稍候...")
         response = requests.get(url, stream=True)
@@ -54,12 +63,19 @@ def download_file(url, local_filename, expected_size_mb=100):
                     percent = downloaded / total_size
                     progress_bar.progress(percent, text=f"下载中 {percent:.1%}")
         progress_bar.empty()
-        st.success("✅ 模型下载完成！")
-        return True
+
+        # 下载后再次验证
+        try:
+            torch.load(local_filename, map_location='cpu', weights_only=False)
+            st.success("✅ 模型下载并验证成功！")
+            return True
+        except Exception as e:
+            st.error(f"❌ 下载的文件不是有效的 PyTorch 模型：{e}")
+            os.remove(local_filename)
+            return False
     except Exception as e:
         st.error(f"❌ 模型下载失败：{e}")
         return False
-
 # 下载多模态模型
 if not download_file(MODEL_URL, MODEL_PATH, expected_size_mb=100):
     st.stop()
