@@ -8,14 +8,14 @@ import timm
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示异常
 import seaborn as sns
 import os
 import requests
 from transformers import BertTokenizer, BertModel
 
 # -------------------- 页面配置 --------------------
-plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示异常
 st.set_page_config(
     page_title="皮肤病智能识别 - 多模态融合",
     page_icon="🩺",
