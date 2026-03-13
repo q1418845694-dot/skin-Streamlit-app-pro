@@ -8,31 +8,11 @@ import timm
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 
-# 设置中文字体
-def setup_chinese_font():
-    try:
-        # 常见的免费中文字体名称（按优先级排序）
-        font_candidates = ['Noto Sans CJK SC', 'WenQuanYi Zen Hei', 'SimHei', 'Microsoft YaHei']
-        # 获取当前系统中所有可用字体
-        available_fonts = [f.name for f in fm.fontManager.ttflist]
-        chosen_font = None
-        for font in font_candidates:
-            if font in available_fonts:
-                chosen_font = font
-                break
-        if chosen_font:
-            plt.rcParams['font.sans-serif'] = [chosen_font] + plt.rcParams.get('font.sans-serif', ['DejaVu Sans'])
-            st.sidebar.success(f"✅ 使用中文字体：{chosen_font}")
-        else:
-            st.sidebar.warning("⚠️ 未找到合适的中文字体，图表中文可能显示异常。")
-        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-    except Exception as e:
-        st.sidebar.warning(f"字体设置失败：{e}")
-
-setup_chinese_font()
+# 强制指定中文字体（按优先级排列）
+plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'WenQuanYi Zen Hei', 
+                                    'SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 import seaborn as sns
 import os
 import requests
