@@ -12,10 +12,10 @@ import matplotlib.font_manager as fm
 import os
 
 # 手动加载字体文件
-font_path = os.path.join(os.path.dirname(__file__), 'simhei.ttf')  # 确保文件名正确
+font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')  # 确保文件名正确
 if os.path.exists(font_path):
     fm.fontManager.addfont(font_path)
-    plt.rcParams['font.sans-serif'] = ['SimHei']  # 字体名称（通常与文件名不同）
+    plt.rcParams['font.sans-serif'] = ['宋体']  # 字体名称（通常与文件名不同）
     st.sidebar.success(f"✅ 已加载中文字体：{font_path}")
 else:
     st.sidebar.warning("⚠️ 未找到中文字体文件，图表中文可能显示为方框。")
