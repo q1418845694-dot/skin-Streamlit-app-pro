@@ -8,11 +8,18 @@ import timm
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import os
 
-# 强制指定中文字体（按优先级排列）
-plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'WenQuanYi Zen Hei', 
-                                    'SimHei', 'Microsoft YaHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+# 手动加载字体文件
+font_path = os.path.join(os.path.dirname(__file__), 'simhei.ttf')  # 确保文件名正确
+if os.path.exists(font_path):
+    fm.fontManager.addfont(font_path)
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # 字体名称（通常与文件名不同）
+    st.sidebar.success(f"✅ 已加载中文字体：{font_path}")
+else:
+    st.sidebar.warning("⚠️ 未找到中文字体文件，图表中文可能显示为方框。")
+plt.rcParams['axes.unicode_minus'] = False
 import seaborn as sns
 import os
 import requests
