@@ -14,6 +14,8 @@ import requests
 from transformers import BertTokenizer, BertModel
 
 # -------------------- 页面配置 --------------------
+plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示异常
 st.set_page_config(
     page_title="皮肤病智能识别 - 多模态融合",
     page_icon="🩺",
@@ -172,6 +174,8 @@ LABEL_MAP = {
     "Cellulitis":"蜂窝织炎",
     "Exanthems":"药疹\病毒性皮疹",
     "Cyst":"皮肤囊肿",
+    "Healthy":"健康",
+    "HFMD":"手足口病",
 }
 def get_chinese_label(english_label):
     """将英文缩写转换为中文显示名称，若找不到映射则返回原名称"""
