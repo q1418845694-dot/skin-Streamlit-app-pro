@@ -10,30 +10,115 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import os
+import seaborn as sns
+import requests
+from transformers import BertTokenizer, BertModel
 
-# 手动加载字体文件
-font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')  # 确保文件名正确
+# ======================== 自定义 CSS 样式 ========================
+st.markdown("""
+<style>
+    /* 全局背景与字体 */
+    .stApp {
+        background-color: #f8f9fa;
+        font-family: 'Segoe UI', 'Roboto', sans-serif;
+    }
+    /* 主标题 */
+    .main-title {
+        text-align: center;
+        padding: 1.5rem 0 0.5rem 0;
+        color: #2c3e50;
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    .main-subtitle {
+        text-align: center;
+        color: #5a6b7c;
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+    }
+    /* 卡片容器 */
+    .card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        transition: box-shadow 0.2s ease;
+    }
+    .card:hover {
+        box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+    }
+    /* 上传区域美化 */
+    .upload-area {
+        border: 2px dashed #ced4da;
+        border-radius: 16px;
+        padding: 2rem 1rem;
+        text-align: center;
+        background-color: #ffffff;
+        transition: border-color 0.2s;
+    }
+    .upload-area:hover {
+        border-color: #6c8cff;
+    }
+    /* 按钮样式 */
+    .stButton>button {
+        background-color: #4a6cf7;
+        color: white;
+        border-radius: 30px;
+        padding: 0.5rem 2rem;
+        font-weight: 600;
+        border: none;
+        transition: background 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: #3a56d4;
+        color: white;
+    }
+    /* 侧边栏移到底部，美化 */
+    .footer-info {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e9ecef;
+        margin-top: 2rem;
+    }
+    /* 结果卡片标题 */
+    .result-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    .confidence-text {
+        font-size: 1.2rem;
+        color: #4a6cf7;
+        font-weight: 500;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ======================== 中文字体设置 ========================
+font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')
 if os.path.exists(font_path):
     fm.fontManager.addfont(font_path)
-    plt.rcParams['font.sans-serif'] = ['宋体']  # 字体名称（通常与文件名不同）
+    plt.rcParams['font.sans-serif'] = ['宋体']
     st.sidebar.success(f"✅ 已加载中文字体：{font_path}")
 else:
     st.sidebar.warning("⚠️ 未找到中文字体文件，图表中文可能显示为方框。")
 plt.rcParams['axes.unicode_minus'] = False
-import seaborn as sns
-import os
-import requests
-from transformers import BertTokenizer, BertModel
 
-# -------------------- 页面配置 --------------------
+# ======================== 页面配置 ========================
 st.set_page_config(
     page_title="皮肤病智能识别 - 多模态融合",
     page_icon="🩺",
     layout="wide"
 )
 
-st.title("🩺 皮肤病智能诊断系统 (图像 + 症状描述)")
-st.markdown("上传皮肤镜图像并填写症状描述，模型将融合两者进行更精准的诊断。")
+# 美化标题（去掉原生的 st.title，使用自定义样式）
+st.markdown('<div class="main-title">🩺 皮肤病智能诊断系统</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-subtitle">图像 + 症状描述 · 多模态精准融合</div>', unsafe_allow_html=True)
 
 # -------------------- 模型下载配置 --------------------
 MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/best_multimodal_model2.0.pth"
@@ -149,10 +234,9 @@ def load_class_names_from_csv(csv_file):
 # -------------------- 加载组件 --------------------
 class_names = load_class_names_from_csv(CSV_PATH)
 
-# ========== 新增：英文缩写 → 中文疾病名称映射 ==========
-# 请根据你数据集中实际的英文缩写修改下面的字典！
+# ========== 英文缩写 → 中文疾病名称映射 ==========
 LABEL_MAP = {
-     "Herpes_Zoster": "带状疱疹",
+    "Herpes_Zoster": "带状疱疹",
     "Basal_Cell_Carcinoma": "基底细胞癌",
     "Melanoma": "黑色素瘤",
     "Melanocytic_Nevus": "色素痣",
@@ -182,20 +266,19 @@ LABEL_MAP = {
     "Scabies":"疥疮",
     "Folliculitis":"毛囊炎",
     "Cellulitis":"蜂窝织炎",
-    "Exanthems":"药疹\病毒性皮疹",
+    "Exanthems":"药疹\\病毒性皮疹",
     "Cyst":"皮肤囊肿",
     "Healthy":"健康",
     "HFMD":"手足口病",
 }
 def get_chinese_label(english_label):
-    """将英文缩写转换为中文显示名称，若找不到映射则返回原名称"""
     return LABEL_MAP.get(english_label, english_label)
-# =====================================================
 
 tokenizer = load_tokenizer()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = load_multimodal_model(MODEL_PATH, len(class_names), device)
 
+# 系统信息移到页面底部，避免侧边栏占用空间
 st.sidebar.markdown("### ⚙️ 系统信息")
 st.sidebar.markdown(f"类别数量: {len(class_names)}")
 st.sidebar.markdown(f"运行设备: `{device}`")
@@ -208,31 +291,46 @@ img_transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# -------------------- 主界面 --------------------
-col1, col2 = st.columns([1, 1])
+# ======================== 主界面布局 ========================
+
+# 使用两列布局，左列上传，右列结果
+col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    uploaded_img = st.file_uploader(
-        "📤 上传皮肤镜图像",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
-        help="支持常见图像格式"
-    )
-    if uploaded_img is not None:
-        image = Image.open(uploaded_img).convert('RGB')
-        st.image(image, caption="原始图像", use_column_width=True)
+    # 上传区域卡片
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("#### 📤 上传皮肤镜图像")
+        uploaded_img = st.file_uploader(
+            label=" ",
+            type=['jpg', 'jpeg', 'png', 'bmp', 'tiff'],
+            help="支持常见图像格式",
+            label_visibility="collapsed"
+        )
+        if uploaded_img is not None:
+            image = Image.open(uploaded_img).convert('RGB')
+            st.image(image, caption="原始图像", use_column_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    symptoms = st.text_area(
-        "📝 请输入症状描述",
-        placeholder="例如：局部红斑、瘙痒、脱屑，持续两周...",
-        help="详细描述可以帮助模型更准确判断"
-    )
+    # 症状输入卡片
+    with st.container():
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("#### 📝 症状描述")
+        symptoms = st.text_area(
+            label=" ",
+            placeholder="例如：局部红斑、瘙痒、脱屑，持续两周...",
+            help="详细描述可以帮助模型更准确判断",
+            label_visibility="collapsed"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-if uploaded_img is not None and symptoms.strip() != "":
-    with col2:
-        st.subheader("🔍 多模态预测结果")
-
+with col2:
+    # 结果显示区域
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("#### 🔍 多模态预测结果")
+    if uploaded_img is not None and symptoms.strip() != "":
+        # 预测逻辑（无改动）
         img_tensor = img_transform(image).unsqueeze(0).to(device)
-
         encoded = tokenizer(
             symptoms,
             padding='max_length',
@@ -250,52 +348,57 @@ if uploaded_img is not None and symptoms.strip() != "":
 
         top5_prob = top5_prob.cpu().numpy()[0]
         top5_idx  = top5_idx.cpu().numpy()[0]
-        # 使用映射函数将英文标签转换为中文显示
         top5_labels = [get_chinese_label(class_names[i]) for i in top5_idx]
 
-        st.markdown(f"### 🥇 融合诊断: **{top5_labels[0]}**")
-        st.markdown(f"置信度: **{top5_prob[0]:.2%}**")
+        # 显示Top-1结果
+        st.markdown(f'<div class="result-title">🥇 融合诊断: **{top5_labels[0]}**</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="confidence-text">置信度: **{top5_prob[0]:.2%}**</div>', unsafe_allow_html=True)
 
-        # Top-5 条形图（标签已用中文）
+        # Top-5 条形图（使用更柔和的颜色）
         fig, ax = plt.subplots(figsize=(6, 3))
-        colors = sns.color_palette("Blues_d", len(top5_prob))
+        colors = sns.color_palette("viridis", len(top5_prob))  # 更美观的配色
         y_pos = np.arange(len(top5_labels))
         ax.barh(y_pos, top5_prob, color=colors)
         ax.set_yticks(y_pos)
         ax.set_yticklabels(top5_labels, fontsize=10)
         ax.invert_yaxis()
-        ax.set_xlabel("置信度")
-        ax.set_title("Top-5 多模态预测")
+        ax.set_xlabel("置信度", fontsize=9)
+        ax.set_title("Top-5 多模态预测", fontsize=12)
         ax.set_xlim(0, 1)
         for i, (prob, label) in enumerate(zip(top5_prob, top5_labels)):
-            ax.text(prob + 0.01, i, f"{prob:.2%}", va='center')
+            ax.text(prob + 0.01, i, f"{prob:.2%}", va='center', fontsize=9)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         st.pyplot(fig)
 
+        # 展开显示Top-10
         with st.expander("📊 查看所有类别的置信度分布"):
             all_prob = probabilities.cpu().numpy()[0]
             sorted_indices = np.argsort(all_prob)[::-1]
-            # 同样对显示标签应用映射
             sorted_labels = [get_chinese_label(class_names[i]) for i in sorted_indices[:10]]
             sorted_probs = all_prob[sorted_indices[:10]]
 
             fig2, ax2 = plt.subplots(figsize=(8, 4))
-            ax2.barh(np.arange(len(sorted_labels)), sorted_probs, color='lightcoral')
+            colors2 = sns.color_palette("coolwarm", len(sorted_probs))
+            ax2.barh(np.arange(len(sorted_labels)), sorted_probs, color=colors2)
             ax2.set_yticks(np.arange(len(sorted_labels)))
             ax2.set_yticklabels(sorted_labels, fontsize=9)
             ax2.invert_yaxis()
-            ax2.set_xlabel("置信度")
-            ax2.set_title("Top-10 类别")
+            ax2.set_xlabel("置信度", fontsize=9)
+            ax2.set_title("Top-10 类别", fontsize=12)
             ax2.set_xlim(0, 1)
+            ax2.spines['top'].set_visible(False)
+            ax2.spines['right'].set_visible(False)
             st.pyplot(fig2)
 
-elif uploaded_img is not None and symptoms.strip() == "":
-    with col2:
+    elif uploaded_img is not None and symptoms.strip() == "":
         st.warning("⚠️ 请输入症状描述以获得多模态融合结果。")
-else:
-    with col2:
+    else:
         st.info("👈 请先上传图像并填写症状描述")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("---")
+# 页面底部信息
+st.markdown('<div class="footer-info">', unsafe_allow_html=True)
 st.markdown("""
 **使用说明**  
 1. 上传一张皮肤镜图像。  
@@ -303,3 +406,4 @@ st.markdown("""
 3. 模型将结合图像和文本进行融合诊断，显示最可能的5种疾病及其置信度。  
 4. 所有模型文件自动从 Hugging Face 下载，首次启动稍慢，后续使用缓存。
 """)
+st.markdown('</div>', unsafe_allow_html=True)
