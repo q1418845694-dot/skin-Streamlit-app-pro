@@ -36,7 +36,7 @@ st.title("🩺 皮肤病智能诊断系统 (图像 + 症状描述)")
 st.markdown("上传皮肤镜图像并填写症状描述，模型将融合两者进行更精准的诊断。")
 
 # -------------------- 模型下载配置 --------------------
-MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/best_multimodal_model.pth"
+MODEL_URL = "https://huggingface.co/datasets/adjuhui/skindiseaseAI/resolve/main/best_multimodal_model2.0.pth"
 MODEL_PATH = "best_multimodal_model.pth"
 CSV_PATH   = "Train_Ready.csv"
 
