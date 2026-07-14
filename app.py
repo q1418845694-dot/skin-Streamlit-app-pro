@@ -1,6 +1,3 @@
-import gc
-torch.cuda.empty_cache() if torch.cuda.is_available() else None
-gc.collect()
 import streamlit as st
 import torch
 import torch.nn as nn
