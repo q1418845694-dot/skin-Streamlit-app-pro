@@ -31,14 +31,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======================== 中文字体 ========================
-font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')
-if os.path.exists(font_path):
-    fm.fontManager.addfont(font_path)
-    plt.rcParams['font.sans-serif'] = ['宋体']
-else:
-    st.sidebar.warning("⚠️ 未找到 SIMSUN.TTC，图表中文可能显示方框。")
-plt.rcParams['axes.unicode_minus'] = False
+# ======================== 中文字体设置（增强版） ========================
+def setup_chinese_font():
+    # 首先尝试从本地文件加载 SIMSUN.TTC（如果存在）
+    font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')
+    if os.path.exists(font_path):
+        try:
+            fm.fontManager.addfont(font_path)
+            plt.rcParams['font.sans-serif'] = ['宋体']
+            plt.rcParams['axes.unicode_minus'] = False
+            st.sidebar.success("✅ 已加载中文字体：SIMSUN.TTC")
+            return True
+        except:
+            pass
+    
+    # 尝试系统自带的中文字体
+    font_list = ['WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'SimHei', 'Microsoft YaHei', 'STHeiti']
+    for font in font_list:
+        try:
+            if any(f.name == font for f in fm.fontManager.ttflist):
+                plt.rcParams['font.sans-serif'] = [font]
+                plt.rcParams['axes.unicode_minus'] = False
+                st.sidebar.success(f"✅ 已加载中文字体：{font}")
+                return True
+        except:
+            continue
+    
+    # 若都不存在，使用英文字体并返回 False
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    st.sidebar.warning("⚠️ 未找到中文字体，图表标签将显示英文。")
+    return False
+
+# 执行字体设置
+CHINESE_FONT_AVAILABLE = setup_chinese_font()
 
 # ======================== 标题 ========================
 st.markdown('<div class="main-title">🩺 皮肤病智能诊断系统</div>', unsafe_allow_html=True)
@@ -126,7 +152,11 @@ LABEL_MAP = {
     "Healthy": "健康", "HFMD": "手足口病",
 }
 def get_chinese_label(eng):
-    return LABEL_MAP.get(eng, eng)
+    """返回中文标签，如果字体不可用则返回英文原词避免乱码"""
+    if CHINESE_FONT_AVAILABLE:
+        return LABEL_MAP.get(eng, eng)
+    else:
+        return eng  # 无法显示中文时使用英文
 
 # ======================== 定义多模态模型（与训练时完全一致） ========================
 class SkinMultiModalModel(nn.Module):
@@ -136,11 +166,9 @@ class SkinMultiModalModel(nn.Module):
         self.image_model.head = nn.Identity()
         img_dim = 768
 
-        # 使用标准 BERT，它会从 Hugging Face 缓存或在线加载（但此处首次会下载到缓存）
         self.text_model = BertModel.from_pretrained('bert-base-chinese')
         text_dim = 768
 
-        # 分类头 —— 与训练代码完全一致
         self.classifier = nn.Sequential(
             nn.Dropout(0.5),
             nn.Linear(img_dim + text_dim, 512),
