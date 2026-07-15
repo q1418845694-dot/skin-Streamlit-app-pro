@@ -31,41 +31,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======================== 中文字体设置（增强版） ========================
-def setup_chinese_font():
-    # 首先尝试从本地文件加载 SIMSUN.TTC（如果存在）
-    font_path = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')
-    if os.path.exists(font_path):
-        try:
-            fm.fontManager.addfont(font_path)
-            plt.rcParams['font.sans-serif'] = ['宋体']
-            plt.rcParams['axes.unicode_minus'] = False
-            st.sidebar.success("✅ 已加载中文字体：SIMSUN.TTC")
-            return True
-        except:
-            pass
-    
-    # 尝试系统自带的中文字体
-    font_list = ['WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'SimHei', 'Microsoft YaHei', 'STHeiti']
-    for font in font_list:
-        try:
-            if any(f.name == font for f in fm.fontManager.ttflist):
-                plt.rcParams['font.sans-serif'] = [font]
-                plt.rcParams['axes.unicode_minus'] = False
-                st.sidebar.success(f"✅ 已加载中文字体：{font}")
-                return True
-        except:
-            continue
-    
-    # 若都不存在，使用英文字体并返回 False
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
-    plt.rcParams['axes.unicode_minus'] = False
-    st.sidebar.warning("⚠️ 未找到中文字体，图表标签将显示英文。")
-    return False
-
-# 执行字体设置
-CHINESE_FONT_AVAILABLE = setup_chinese_font()
-
 # ======================== 标题 ========================
 st.markdown('<div class="main-title">🩺 皮肤病智能诊断系统</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-subtitle">图像 + 症状描述 · 多模态精准融合</div>', unsafe_allow_html=True)
@@ -133,7 +98,7 @@ class_names = sorted(list(df['Label'].unique()))
 num_classes = len(class_names)
 st.sidebar.markdown(f"**类别数量：** {num_classes}")
 
-# ======================== 英文→中文映射 ========================
+# ======================== 中文映射与字体管理 ========================
 LABEL_MAP = {
     "Herpes_Zoster": "带状疱疹", "Basal_Cell_Carcinoma": "基底细胞癌",
     "Melanoma": "黑色素瘤", "Melanocytic_Nevus": "色素痣",
@@ -151,14 +116,49 @@ LABEL_MAP = {
     "Exanthems": "药疹/病毒性皮疹", "Cyst": "皮肤囊肿",
     "Healthy": "健康", "HFMD": "手足口病",
 }
+
+# ----- 智能字体加载 -----
+CHINESE_FONT_LOADED = False
+
+# 尝试从本地文件加载字体
+font_file = os.path.join(os.path.dirname(__file__), 'SIMSUN.TTC')
+if os.path.exists(font_file):
+    try:
+        fm.fontManager.addfont(font_file)
+        # 获取字体的实际名称
+        font_prop = fm.FontProperties(fname=font_file)
+        font_name = font_prop.get_name()
+        plt.rcParams['font.sans-serif'] = [font_name]
+        plt.rcParams['axes.unicode_minus'] = False
+        CHINESE_FONT_LOADED = True
+        st.sidebar.success(f"✅ 已加载中文字体：{font_name}")
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ 加载本地字体失败：{e}")
+
+# 如果本地字体未加载，尝试系统字体
+if not CHINESE_FONT_LOADED:
+    system_fonts = ['WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'SimHei', 'Microsoft YaHei']
+    available_fonts = [f.name for f in fm.fontManager.ttflist]
+    for font in system_fonts:
+        if font in available_fonts:
+            plt.rcParams['font.sans-serif'] = [font]
+            plt.rcParams['axes.unicode_minus'] = False
+            CHINESE_FONT_LOADED = True
+            st.sidebar.success(f"✅ 使用系统字体：{font}")
+            break
+
+# 如果仍然没有中文字体，则使用英文标签（避免乱码）
 def get_chinese_label(eng):
-    """返回中文标签，如果字体不可用则返回英文原词避免乱码"""
-    if CHINESE_FONT_AVAILABLE:
+    """根据字体是否可用返回中文或英文标签"""
+    if CHINESE_FONT_LOADED:
         return LABEL_MAP.get(eng, eng)
     else:
-        return eng  # 无法显示中文时使用英文
+        return eng  # 返回英文，绝无乱码
 
-# ======================== 定义多模态模型（与训练时完全一致） ========================
+if not CHINESE_FONT_LOADED:
+    st.sidebar.warning("⚠️ 未找到中文字体，将显示英文标签，避免乱码。")
+
+# ======================== 定义多模态模型 ========================
 class SkinMultiModalModel(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -193,13 +193,12 @@ class SkinMultiModalModel(nn.Module):
         fused = torch.cat((img_features, text_features), dim=1)
         return self.classifier(fused)
 
-# ======================== 加载模型（使用 strict=False） ========================
+# ======================== 加载模型 ========================
 @st.cache_resource
 def load_multimodal_model(model_path, num_classes, device):
     model = SkinMultiModalModel(num_classes)
     state_dict = torch.load(model_path, map_location=device, weights_only=False)
-    # 关键：strict=False 忽略 Dropout 层缺失的键（它们没有参数）
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict, strict=False)  # 忽略 Dropout 层缺失
     model = model.to(device)
     model.eval()
     return model
@@ -285,8 +284,8 @@ with col2:
         ax.set_yticks(y_pos)
         ax.set_yticklabels(top5_labels, fontsize=10)
         ax.invert_yaxis()
-        ax.set_xlabel("置信度", fontsize=9)
-        ax.set_title("Top-5 多模态预测", fontsize=12)
+        ax.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
+        ax.set_title("Top-5 Predictions" if not CHINESE_FONT_LOADED else "Top-5 多模态预测", fontsize=12)
         ax.set_xlim(0, 1)
         for i, (prob, label) in enumerate(zip(top5_prob, top5_labels)):
             ax.text(prob + 0.01, i, f"{prob:.2%}", va='center', fontsize=9)
@@ -306,8 +305,8 @@ with col2:
             ax2.set_yticks(np.arange(len(sorted_labels)))
             ax2.set_yticklabels(sorted_labels, fontsize=9)
             ax2.invert_yaxis()
-            ax2.set_xlabel("置信度", fontsize=9)
-            ax2.set_title("Top-10 类别", fontsize=12)
+            ax2.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
+            ax2.set_title("Top-10 Categories" if not CHINESE_FONT_LOADED else "Top-10 类别", fontsize=12)
             ax2.set_xlim(0, 1)
             ax2.spines['top'].set_visible(False)
             ax2.spines['right'].set_visible(False)
