@@ -13,52 +13,8 @@ import seaborn as sns
 import os
 import requests
 from transformers import BertTokenizer, BertModel
-import streamlit as st
-from openai import OpenAI
+from openai import OpenAI  # 新增
 
-# 1. 页面配置与标题
-st.set_page_config(page_title="皮肤病智能助手", page_icon="🩺")
-st.title("🩺 皮肤病智能助手")
-
-# 2. 初始化 DeepSeek 客户端
-# 确保你在 .streamlit/secrets.toml 中设置了 DEEPSEEK_API_KEY
-try:
-    client = OpenAI(
-        api_key=st.secrets["DEEPSEEK_API_KEY"],
-        base_url="https://api.deepseek.com"
-    )
-except KeyError:
-    st.error("❌ 未找到 DeepSeek API Key。请在 `.streamlit/secrets.toml` 文件中配置 `DEEPSEEK_API_KEY`。")
-    st.stop()
-
-# 3. 定义调用函数
-def get_deepseek_response(prompt):
-    try:
-        response = client.chat.completions.create(
-            model="deepseek-v4-pro",
-            messages=[
-                {"role": "system", "content": "你是一个专业的皮肤科医生助手。"},
-                {"role": "user", "content": prompt}
-            ],
-            stream=False
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"❌ 调用 API 时出错: {e}"
-
-# 4. 构建用户界面
-st.markdown("---")
-st.subheader("💬 向 AI 咨询皮肤问题")
-
-user_question = st.text_area("请输入您的疑问：", height=100)
-if st.button("💡 获取建议"):
-    if user_question:
-        with st.spinner("AI 正在分析您的问题..."):
-            answer = get_deepseek_response(user_question)
-        st.success("✅ AI 建议：")
-        st.write(answer)
-    else:
-        st.warning("⚠️ 请先输入您的问题。")
 # ======================== 页面配置 ========================
 st.set_page_config(page_title="皮肤病智能识别 - 多模态融合", page_icon="🩺", layout="wide")
 
@@ -163,16 +119,47 @@ st.markdown("""
         border-radius: 40px;
     }
 
-    /* 底部 */
+    /* 底部通用 */
     .footer-info {
         text-align: center;
         color: #5a7a9a;
         font-size: 0.85rem;
-        padding-top: 2rem;
-        margin-top: 2rem;
+        padding-top: 1rem;
+        margin-top: 1rem;
         border-top: 1px solid rgba(0,0,0,0.05);
         font-weight: 300;
         letter-spacing: 0.5px;
+    }
+    .footer-card {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(8px);
+        border-radius: 16px;
+        padding: 1.2rem 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        height: 100%;
+    }
+    .footer-card h4 {
+        color: #2b6cb0;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    .footer-card ul, .footer-card p {
+        margin: 0.2rem 0;
+        color: #2d3748;
+        font-size: 0.9rem;
+        padding-left: 1.2rem;
+    }
+    .footer-card ul li {
+        margin-bottom: 0.2rem;
+    }
+    .warning-text {
+        color: #c05621;
+        font-weight: 500;
+        background: rgba(192, 86, 33, 0.08);
+        padding: 0.1rem 0.6rem;
+        border-radius: 20px;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -276,7 +263,6 @@ if os.path.exists(font_file):
         pass
 
 if not CHINESE_FONT_LOADED:
-    # 尝试系统字体
     system_fonts = ['WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'SimHei', 'Microsoft YaHei']
     available = [f.name for f in fm.fontManager.ttflist]
     for f in system_fonts:
@@ -294,7 +280,7 @@ def get_chinese_label(eng):
     if CHINESE_FONT_LOADED:
         return LABEL_MAP.get(eng, eng)
     else:
-        return eng  # 回退英文
+        return eng
 
 # ======================== 多模态模型定义 ========================
 class SkinMultiModalModel(nn.Module):
@@ -391,7 +377,6 @@ with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🔍 多模态预测结果")
     if uploaded_img is not None and symptoms.strip() != "":
-        # 显示加载提示
         with st.spinner("🧠 模型正在分析图像与症状..."):
             img_tensor = img_transform(image).unsqueeze(0).to(device)
             encoded = tokenizer(
@@ -413,13 +398,11 @@ with col2:
             top5_idx = top5_idx.cpu().numpy()[0]
             top5_labels = [get_chinese_label(class_names[i]) for i in top5_idx]
 
-            # 显示结果（无星号）
             st.markdown(f'<div class="result-title">🥇 融合诊断: {top5_labels[0]}</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="confidence-text">置信度: {top5_prob[0]:.2%}</div>', unsafe_allow_html=True)
 
-            # Top‑5 条形图（蓝色医疗色板）
             fig, ax = plt.subplots(figsize=(6, 3))
-            colors = sns.color_palette("Blues_r", len(top5_prob))  # 新色板
+            colors = sns.color_palette("Blues_r", len(top5_prob))
             y_pos = np.arange(len(top5_labels))
             ax.barh(y_pos, top5_prob, color=colors)
             ax.set_yticks(y_pos)
@@ -434,7 +417,6 @@ with col2:
             ax.spines['right'].set_visible(False)
             st.pyplot(fig)
 
-            # 展开 Top‑10（绿色色板）
             with st.expander("📊 查看所有类别的置信度分布"):
                 all_prob = probs.cpu().numpy()[0]
                 sorted_indices = np.argsort(all_prob)[::-1]
@@ -460,13 +442,72 @@ with col2:
         st.info("👈 请先上传图像并填写症状描述")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ======================== 底部 ========================
-st.markdown('<div class="footer-info">', unsafe_allow_html=True)
-st.markdown("""
-**使用说明**  
-1. 上传一张皮肤镜图像。  
-2. 在文本框中输入详细的症状描述（中文）。  
-3. 模型将结合图像和文本进行融合诊断，显示最可能的5种疾病及其置信度。  
-4. 模型文件自动从 Hugging Face 下载，首次启动稍慢，后续使用缓存。
-""")
-st.markdown('</div>', unsafe_allow_html=True)
+# ======================== 底部区域：使用说明 + 注意事项（两列） ========================
+st.markdown("---")
+col_left, col_right = st.columns(2, gap="large")
+
+with col_left:
+    st.markdown("""
+    <div class="footer-card">
+        <h4>📖 使用说明</h4>
+        <ul>
+            <li>上传一张皮肤镜图像（支持 jpg/png 等常见格式）。</li>
+            <li>在文本框中输入详细的症状描述（中文）。</li>
+            <li>点击“诊断”或等待自动分析，模型将展示 Top‑5 预测结果。</li>
+            <li>所有模型文件自动从 Hugging Face 下载，首次启动稍慢。</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_right:
+    st.markdown("""
+    <div class="footer-card">
+        <h4>⚠️ 注意事项</h4>
+        <p><span class="warning-text">· 本系统仅供科研演示参考，不构成医疗建议。</span></p>
+        <p>· 诊断结果不能替代专业医生的临床判断。</p>
+        <p>· 如出现皮肤问题，请及时前往正规医院就诊。</p>
+        <p>· 数据上传后仅用于本次推理，不会存储用户隐私。</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ======================== 最底部：AI 智能问诊助手 ========================
+st.markdown("---")
+st.markdown("### 💬 AI 智能问诊助手")
+
+# 读取 API Key（如果设置了）
+try:
+    deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
+except:
+    deepseek_api_key = None
+
+if deepseek_api_key:
+    client = OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+    user_question = st.text_area("输入您的问题（例如：这个病严重吗？需要怎么护理？）", height=80, key="ai_question")
+    if st.button("💡 获取 AI 建议", key="ai_button"):
+        if user_question:
+            # 如果有诊断结果，可作为上下文
+            try:
+                context = f"用户上传了皮肤图像，症状描述为：{symptoms}，模型初步诊断为：{top5_labels[0]}（置信度 {top5_prob[0]:.2%}）"
+            except:
+                context = "用户尚未进行图像诊断，仅提出一般性问题。"
+            full_prompt = f"{context}\n\n用户疑问：{user_question}"
+            with st.spinner("AI 正在思考..."):
+                try:
+                    response = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[
+                            {"role": "system", "content": "你是一位专业的皮肤科医生助手，请基于用户的诊断结果和症状提供专业、易懂的建议。"},
+                            {"role": "user", "content": full_prompt}
+                        ]
+                    )
+                    st.success("💡 AI 建议：")
+                    st.write(response.choices[0].message.content)
+                except Exception as e:
+                    st.error(f"调用 API 失败：{e}")
+        else:
+            st.warning("请先输入您的问题。")
+else:
+    st.info("🔑 如需使用 AI 问诊，请在 `.streamlit/secrets.toml` 中配置 `DEEPSEEK_API_KEY`。")
+
+# 尾部版权信息（可选）
+st.markdown('<div class="footer-info">Powered by Streamlit · 多模态融合模型 · 仅供科研使用</div>', unsafe_allow_html=True)
