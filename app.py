@@ -13,7 +13,52 @@ import seaborn as sns
 import os
 import requests
 from transformers import BertTokenizer, BertModel
+import streamlit as st
+from openai import OpenAI
 
+# 1. 页面配置与标题
+st.set_page_config(page_title="皮肤病智能助手", page_icon="🩺")
+st.title("🩺 皮肤病智能助手")
+
+# 2. 初始化 DeepSeek 客户端
+# 确保你在 .streamlit/secrets.toml 中设置了 DEEPSEEK_API_KEY
+try:
+    client = OpenAI(
+        api_key=st.secrets["DEEPSEEK_API_KEY"],
+        base_url="https://api.deepseek.com"
+    )
+except KeyError:
+    st.error("❌ 未找到 DeepSeek API Key。请在 `.streamlit/secrets.toml` 文件中配置 `DEEPSEEK_API_KEY`。")
+    st.stop()
+
+# 3. 定义调用函数
+def get_deepseek_response(prompt):
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-v4-pro",
+            messages=[
+                {"role": "system", "content": "你是一个专业的皮肤科医生助手。"},
+                {"role": "user", "content": prompt}
+            ],
+            stream=False
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"❌ 调用 API 时出错: {e}"
+
+# 4. 构建用户界面
+st.markdown("---")
+st.subheader("💬 向 AI 咨询皮肤问题")
+
+user_question = st.text_area("请输入您的疑问：", height=100)
+if st.button("💡 获取建议"):
+    if user_question:
+        with st.spinner("AI 正在分析您的问题..."):
+            answer = get_deepseek_response(user_question)
+        st.success("✅ AI 建议：")
+        st.write(answer)
+    else:
+        st.warning("⚠️ 请先输入您的问题。")
 # ======================== 页面配置 ========================
 st.set_page_config(page_title="皮肤病智能识别 - 多模态融合", page_icon="🩺", layout="wide")
 
