@@ -274,8 +274,8 @@ with col2:
         top5_idx = top5_idx.cpu().numpy()[0]
         top5_labels = [get_chinese_label(class_names[i]) for i in top5_idx]
 
-        st.markdown(f'<div class="result-title">🥇 融合诊断: **{top5_labels[0]}**</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="confidence-text">置信度: **{top5_prob[0]:.2%}**</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="result-title">🥇 融合诊断: {top5_labels[0]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="confidence-text">置信度: {top5_prob[0]:.2%}</div>', unsafe_allow_html=True)
 
         fig, ax = plt.subplots(figsize=(6, 3))
         colors = sns.color_palette("viridis", len(top5_prob))
