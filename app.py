@@ -13,21 +13,18 @@ import seaborn as sns
 import os
 import requests
 from transformers import BertTokenizer, BertModel
-from openai import OpenAI  # 新增
+from openai import OpenAI
 
 # ======================== 页面配置 ========================
 st.set_page_config(page_title="皮肤病智能识别 - 多模态融合", page_icon="🩺", layout="wide")
 
-# ======================== 全新 CSS（毛玻璃 + 医疗蓝） ========================
+# ======================== CSS（毛玻璃 + 医疗蓝） ========================
 st.markdown("""
 <style>
-    /* 全局渐变背景 */
     .stApp {
         background: linear-gradient(145deg, #f0f4f8 0%, #d9e2ec 100%);
         font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
     }
-
-    /* 主标题 - 渐变文字 */
     .main-title {
         text-align: center;
         padding: 2rem 0 0.2rem 0;
@@ -39,7 +36,6 @@ st.markdown("""
         letter-spacing: -0.5px;
         text-shadow: 0 2px 10px rgba(43, 108, 176, 0.15);
     }
-
     .main-subtitle {
         text-align: center;
         color: #4a6a8a;
@@ -48,8 +44,6 @@ st.markdown("""
         margin-bottom: 2rem;
         letter-spacing: 2px;
     }
-
-    /* 毛玻璃卡片 */
     .card {
         background: rgba(255, 255, 255, 0.75);
         backdrop-filter: blur(12px);
@@ -67,22 +61,6 @@ st.markdown("""
         transform: translateY(-4px);
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
     }
-
-    /* 上传区域 */
-    .upload-area {
-        border: 2px dashed #bdd3e8;
-        border-radius: 20px;
-        padding: 2rem 1rem;
-        text-align: center;
-        background: rgba(255, 255, 255, 0.4);
-        transition: all 0.3s;
-    }
-    .upload-area:hover {
-        border-color: #4299e1;
-        background: rgba(66, 153, 225, 0.05);
-    }
-
-    /* 主按钮 - 医疗蓝渐变 */
     .stButton>button {
         background: linear-gradient(135deg, #3182ce, #2b6cb0) !important;
         color: white !important;
@@ -100,8 +78,6 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(49, 130, 206, 0.5) !important;
         background: linear-gradient(135deg, #2b6cb0, #1a365d) !important;
     }
-
-    /* 结果文本 */
     .result-title {
         font-size: 1.8rem;
         font-weight: 700;
@@ -117,18 +93,6 @@ st.markdown("""
         padding: 0.2rem 1rem;
         background: rgba(43, 108, 176, 0.08);
         border-radius: 40px;
-    }
-
-    /* 底部通用 */
-    .footer-info {
-        text-align: center;
-        color: #5a7a9a;
-        font-size: 0.85rem;
-        padding-top: 1rem;
-        margin-top: 1rem;
-        border-top: 1px solid rgba(0,0,0,0.05);
-        font-weight: 300;
-        letter-spacing: 0.5px;
     }
     .footer-card {
         background: rgba(255, 255, 255, 0.6);
@@ -160,6 +124,16 @@ st.markdown("""
         padding: 0.1rem 0.6rem;
         border-radius: 20px;
         display: inline-block;
+    }
+    .footer-info {
+        text-align: center;
+        color: #5a7a9a;
+        font-size: 0.85rem;
+        padding-top: 1rem;
+        margin-top: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+        font-weight: 300;
+        letter-spacing: 0.5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -219,7 +193,6 @@ def download_file(url, local_filename, expected_size_mb=100):
 if not download_file(MODEL_URL, MODEL_PATH, expected_size_mb=100):
     st.stop()
 
-# -------------------- 检查 CSV --------------------
 if not os.path.exists(CSV_PATH):
     st.error(f"❌ 未找到 Train_Ready.csv 文件，请将其放置在应用目录下。")
     st.stop()
@@ -373,76 +346,104 @@ with col1:
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 启动识别按钮
+    st.markdown('<div style="text-align: center; margin-top: -0.5rem;">', unsafe_allow_html=True)
+    start_btn = st.button("🚀 启动识别", use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with col2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🔍 多模态预测结果")
-    if uploaded_img is not None and symptoms.strip() != "":
-        with st.spinner("🧠 模型正在分析图像与症状..."):
-            img_tensor = img_transform(image).unsqueeze(0).to(device)
-            encoded = tokenizer(
-                symptoms,
-                padding='max_length',
-                truncation=True,
-                max_length=64,
-                return_tensors='pt'
-            )
-            input_ids = encoded['input_ids'].to(device)
-            attention_mask = encoded['attention_mask'].to(device)
+    
+    # 使用 session_state 存储结果
+    if 'result' not in st.session_state:
+        st.session_state.result = None
+        st.session_state.top5_labels = None
+        st.session_state.top5_prob = None
+        st.session_state.probs = None
 
-            with torch.no_grad():
-                outputs = model(img_tensor, input_ids, attention_mask)
-                probs = F.softmax(outputs, dim=1)
-                top5_prob, top5_idx = torch.topk(probs, 5)
+    if start_btn:
+        if uploaded_img is not None and symptoms.strip() != "":
+            with st.spinner("🧠 模型正在分析图像与症状..."):
+                img_tensor = img_transform(image).unsqueeze(0).to(device)
+                encoded = tokenizer(
+                    symptoms,
+                    padding='max_length',
+                    truncation=True,
+                    max_length=64,
+                    return_tensors='pt'
+                )
+                input_ids = encoded['input_ids'].to(device)
+                attention_mask = encoded['attention_mask'].to(device)
 
-            top5_prob = top5_prob.cpu().numpy()[0]
-            top5_idx = top5_idx.cpu().numpy()[0]
-            top5_labels = [get_chinese_label(class_names[i]) for i in top5_idx]
+                with torch.no_grad():
+                    outputs = model(img_tensor, input_ids, attention_mask)
+                    probs = F.softmax(outputs, dim=1)
+                    top5_prob, top5_idx = torch.topk(probs, 5)
 
-            st.markdown(f'<div class="result-title">🥇 融合诊断: {top5_labels[0]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="confidence-text">置信度: {top5_prob[0]:.2%}</div>', unsafe_allow_html=True)
+                top5_prob = top5_prob.cpu().numpy()[0]
+                top5_idx = top5_idx.cpu().numpy()[0]
+                top5_labels = [get_chinese_label(class_names[i]) for i in top5_idx]
 
-            fig, ax = plt.subplots(figsize=(6, 3))
-            colors = sns.color_palette("Blues_r", len(top5_prob))
-            y_pos = np.arange(len(top5_labels))
-            ax.barh(y_pos, top5_prob, color=colors)
-            ax.set_yticks(y_pos)
-            ax.set_yticklabels(top5_labels, fontsize=10)
-            ax.invert_yaxis()
-            ax.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
-            ax.set_title("Top-5 Predictions" if not CHINESE_FONT_LOADED else "Top-5 多模态预测", fontsize=12)
-            ax.set_xlim(0, 1)
-            for i, (prob, label) in enumerate(zip(top5_prob, top5_labels)):
-                ax.text(prob + 0.01, i, f"{prob:.2%}", va='center', fontsize=9)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            st.pyplot(fig)
+                st.session_state.result = True
+                st.session_state.top5_labels = top5_labels
+                st.session_state.top5_prob = top5_prob
+                st.session_state.probs = probs.cpu().numpy()[0]
+        else:
+            st.warning("请先上传图像并填写症状描述。")
 
-            with st.expander("📊 查看所有类别的置信度分布"):
-                all_prob = probs.cpu().numpy()[0]
-                sorted_indices = np.argsort(all_prob)[::-1]
-                sorted_labels = [get_chinese_label(class_names[i]) for i in sorted_indices[:10]]
-                sorted_probs = all_prob[sorted_indices[:10]]
+    # 显示结果（如果有）
+    if st.session_state.result:
+        top5_labels = st.session_state.top5_labels
+        top5_prob = st.session_state.top5_prob
+        probs = st.session_state.probs
 
-                fig2, ax2 = plt.subplots(figsize=(8, 4))
-                colors2 = sns.color_palette("Greens_r", len(sorted_probs))
-                ax2.barh(np.arange(len(sorted_labels)), sorted_probs, color=colors2)
-                ax2.set_yticks(np.arange(len(sorted_labels)))
-                ax2.set_yticklabels(sorted_labels, fontsize=9)
-                ax2.invert_yaxis()
-                ax2.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
-                ax2.set_title("Top-10 Categories" if not CHINESE_FONT_LOADED else "Top-10 类别", fontsize=12)
-                ax2.set_xlim(0, 1)
-                ax2.spines['top'].set_visible(False)
-                ax2.spines['right'].set_visible(False)
-                st.pyplot(fig2)
+        st.markdown(f'<div class="result-title">🥇 融合诊断: {top5_labels[0]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="confidence-text">置信度: {top5_prob[0]:.2%}</div>', unsafe_allow_html=True)
 
-    elif uploaded_img is not None and symptoms.strip() == "":
-        st.warning("⚠️ 请输入症状描述以获得多模态融合结果。")
+        fig, ax = plt.subplots(figsize=(6, 3))
+        colors = sns.color_palette("Blues_r", len(top5_prob))
+        y_pos = np.arange(len(top5_labels))
+        ax.barh(y_pos, top5_prob, color=colors)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(top5_labels, fontsize=10)
+        ax.invert_yaxis()
+        ax.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
+        ax.set_title("Top-5 Predictions" if not CHINESE_FONT_LOADED else "Top-5 多模态预测", fontsize=12)
+        ax.set_xlim(0, 1)
+        for i, (prob, label) in enumerate(zip(top5_prob, top5_labels)):
+            ax.text(prob + 0.01, i, f"{prob:.2%}", va='center', fontsize=9)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        st.pyplot(fig)
+
+        with st.expander("📊 查看所有类别的置信度分布"):
+            all_prob = probs
+            sorted_indices = np.argsort(all_prob)[::-1]
+            sorted_labels = [get_chinese_label(class_names[i]) for i in sorted_indices[:10]]
+            sorted_probs = all_prob[sorted_indices[:10]]
+
+            fig2, ax2 = plt.subplots(figsize=(8, 4))
+            colors2 = sns.color_palette("Greens_r", len(sorted_probs))
+            ax2.barh(np.arange(len(sorted_labels)), sorted_probs, color=colors2)
+            ax2.set_yticks(np.arange(len(sorted_labels)))
+            ax2.set_yticklabels(sorted_labels, fontsize=9)
+            ax2.invert_yaxis()
+            ax2.set_xlabel("Confidence" if not CHINESE_FONT_LOADED else "置信度", fontsize=9)
+            ax2.set_title("Top-10 Categories" if not CHINESE_FONT_LOADED else "Top-10 类别", fontsize=12)
+            ax2.set_xlim(0, 1)
+            ax2.spines['top'].set_visible(False)
+            ax2.spines['right'].set_visible(False)
+            st.pyplot(fig2)
+
+    elif start_btn and (uploaded_img is None or symptoms.strip() == ""):
+        # 已通过上面的warning处理
+        pass
     else:
-        st.info("👈 请先上传图像并填写症状描述")
+        st.info("👈 请先上传图像、填写症状，然后点击「启动识别」按钮。")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ======================== 底部区域：使用说明 + 注意事项（两列） ========================
+# ======================== 底部区域：使用说明 + 注意事项 ========================
 st.markdown("---")
 col_left, col_right = st.columns(2, gap="large")
 
@@ -453,7 +454,7 @@ with col_left:
         <ul>
             <li>上传一张皮肤镜图像（支持 jpg/png 等常见格式）。</li>
             <li>在文本框中输入详细的症状描述（中文）。</li>
-            <li>点击“诊断”或等待自动分析，模型将展示 Top‑5 预测结果。</li>
+            <li>点击「启动识别」按钮，模型将展示 Top‑5 预测结果。</li>
             <li>所有模型文件自动从 Hugging Face 下载，首次启动稍慢。</li>
         </ul>
     </div>
@@ -463,7 +464,6 @@ with col_right:
     st.markdown("""
     <div class="footer-card">
         <h4>⚠️ 注意事项</h4>
-        <p><span class="warning-text">· 本系统仅供科研演示参考，不构成医疗建议。</span></p>
         <p>· 诊断结果不能替代专业医生的临床判断。</p>
         <p>· 如出现皮肤问题，请及时前往正规医院就诊。</p>
         <p>· 数据上传后仅用于本次推理，不会存储用户隐私。</p>
@@ -474,7 +474,6 @@ with col_right:
 st.markdown("---")
 st.markdown("### 💬 AI 智能问诊助手")
 
-# 读取 API Key（如果设置了）
 try:
     deepseek_api_key = st.secrets["DEEPSEEK_API_KEY"]
 except:
@@ -485,10 +484,10 @@ if deepseek_api_key:
     user_question = st.text_area("输入您的问题（例如：这个病严重吗？需要怎么护理？）", height=80, key="ai_question")
     if st.button("💡 获取 AI 建议", key="ai_button"):
         if user_question:
-            # 如果有诊断结果，可作为上下文
-            try:
-                context = f"用户上传了皮肤图像，症状描述为：{symptoms}，模型初步诊断为：{top5_labels[0]}（置信度 {top5_prob[0]:.2%}）"
-            except:
+            # 如果已有诊断结果，将其作为上下文
+            if st.session_state.result:
+                context = f"用户上传了皮肤图像，症状描述为：{symptoms}，模型初步诊断为：{st.session_state.top5_labels[0]}（置信度 {st.session_state.top5_prob[0]:.2%}）"
+            else:
                 context = "用户尚未进行图像诊断，仅提出一般性问题。"
             full_prompt = f"{context}\n\n用户疑问：{user_question}"
             with st.spinner("AI 正在思考..."):
@@ -509,5 +508,4 @@ if deepseek_api_key:
 else:
     st.info("🔑 如需使用 AI 问诊，请在 `.streamlit/secrets.toml` 中配置 `DEEPSEEK_API_KEY`。")
 
-# 尾部版权信息（可选）
 st.markdown('<div class="footer-info">Powered by Streamlit · 多模态融合模型 · 仅供科研使用</div>', unsafe_allow_html=True)
